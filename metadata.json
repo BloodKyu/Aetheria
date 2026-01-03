@@ -1,0 +1,5 @@
+{
+  "name": "Retro Quest 64",
+  "description": "A cross-platform N64-style action RPG engine featuring low-poly aesthetics, procedural animations, and touch-optimized controls.",
+  "requestFramePermissions": []
+}
