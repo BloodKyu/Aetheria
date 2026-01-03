@@ -10,7 +10,7 @@ export class PhaseState extends PlayerState {
     this.player.velocity.set(0, 0, 0); 
   }
 
-  update(dt: number, input: InputState): void {
+  update(dt: number, input: InputState, camera?: THREE.Camera): void {
     const time = Date.now() * 0.001;
     this.player.mesh.position.z = Math.sin(time) * 0.5 + 1.0;
 

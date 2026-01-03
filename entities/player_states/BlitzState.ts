@@ -24,7 +24,7 @@ export class BlitzState extends PlayerState {
     mat.color.setHex(0x00FFFF);
   }
 
-  update(dt: number, input: InputState): void {
+  update(dt: number, input: InputState, camera?: THREE.Camera): void {
     this.timer += dt;
     if (this.timer > this.duration) {
         if (input.move.x !== 0 || input.move.y !== 0) {

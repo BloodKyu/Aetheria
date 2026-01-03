@@ -1,6 +1,7 @@
 
 import { InputState } from '../../types';
 import type { Player } from '../Player';
+import * as THREE from 'three';
 
 export abstract class PlayerState {
   protected player: Player;
@@ -10,6 +11,6 @@ export abstract class PlayerState {
   }
 
   abstract enter(): void;
-  abstract update(dt: number, input: InputState): void;
+  abstract update(dt: number, input: InputState, camera?: THREE.Camera): void;
   abstract exit(): void;
 }

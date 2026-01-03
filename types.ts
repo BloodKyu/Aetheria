@@ -10,6 +10,14 @@ export interface InputState {
   attack: boolean;
   blitz: boolean; // Dash/Teleport
   phase: boolean; // Safe mode toggle
+  focus: boolean; // Z-Targeting / Camera Reset
+}
+
+export interface GameState {
+  health: number;
+  maxHealth: number;
+  score: number;
+  isGameOver: boolean;
 }
 
 export enum ButtonType {

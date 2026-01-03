@@ -9,6 +9,7 @@ import { JumpState } from './player_states/JumpState';
 import { AttackState } from './player_states/AttackState';
 import { BlitzState } from './player_states/BlitzState';
 import { PhaseState } from './player_states/PhaseState';
+import { audioSystem } from '../services/AudioSystem';
 
 export interface PlayerParts {
     pelvis: THREE.Mesh;
@@ -147,7 +148,22 @@ export class Player {
   public parts: PlayerParts;
   public animConfig: AnimationConfig;
   
+  // Game Stats
+  public health: number = 3;
+  public maxHealth: number = 3;
+  public invincibilityTimer: number = 0;
+  
+  // Physics Dimensions
+  private radius = 0.4;
+  private height = 1.6;
+  private maxStepHeight = 0.6; 
+
+  // COMBAT & TARGETING
+  public isHitActive: boolean = false; 
+  public lockTarget: THREE.Vector3 | null = null;
+  
   private currentState: PlayerState;
+  private flashTimer: number = 0;
 
   constructor() {
     this.velocity = new THREE.Vector3(0, 0, 0);
@@ -174,6 +190,34 @@ export class Player {
     if (this.currentState) this.currentState.exit();
     this.currentState = newState;
     this.currentState.enter();
+  }
+
+  public takeDamage(amount: number, knockbackDir: THREE.Vector3) {
+      if (this.invincibilityTimer > 0) return;
+
+      this.health = Math.max(0, this.health - amount);
+      this.invincibilityTimer = 1.0; // 1 second immunity
+      this.flashTimer = 1.0;
+      
+      // Knockback
+      this.velocity.copy(knockbackDir).multiplyScalar(15);
+      this.velocity.z = 10; // Pop up
+      this.onGround = false;
+
+      // Audio
+      audioSystem.play('hit');
+  }
+
+  public reset(position: THREE.Vector3) {
+      this.health = this.maxHealth;
+      this.invincibilityTimer = 0;
+      this.flashTimer = 0;
+      this.velocity.set(0, 0, 0);
+      this.mesh.position.copy(position);
+      this.mesh.visible = true;
+      this.onGround = true;
+      this.lockTarget = null;
+      this.switchState(StateID.IDLE);
   }
   
   public getCurrentStateName(): string {
@@ -353,22 +397,169 @@ export class Player {
     };
   }
 
-  public update(dt: number, input: InputState) {
-    this.currentState.update(dt, input);
-
-    // Physics
-    this.velocity.z -= GAME_CONFIG.GRAVITY * dt;
-
-    this.mesh.position.x += this.velocity.x * dt;
-    this.mesh.position.y += this.velocity.y * dt;
-    this.mesh.position.z += this.velocity.z * dt;
-
-    // Floor
-    if (this.mesh.position.z < 0) {
-      this.mesh.position.z = 0;
-      this.velocity.z = 0;
-      this.onGround = true;
+  public update(dt: number, input: InputState, colliders: THREE.Box3[] = [], camera?: THREE.Camera) {
+    this.currentState.update(dt, input, camera);
+    
+    // Timer updates
+    if (this.invincibilityTimer > 0) {
+        this.invincibilityTimer -= dt;
+        this.flashTimer -= dt;
+        
+        // Blink effect
+        const visible = Math.floor(this.flashTimer * 10) % 2 === 0;
+        this.mesh.visible = visible;
+        
+        if (this.invincibilityTimer <= 0) {
+            this.mesh.visible = true;
+        }
     }
+
+    // Apply Gravity
+    this.velocity.z -= GAME_CONFIG.GRAVITY * dt;
+    this.velocity.z = Math.max(this.velocity.z, -20); // Terminal velocity
+
+    // --- PHYSICS STEP ---
+    // We move axis by axis to handle sliding collisions
+    
+    // 1. X Axis
+    const dx = this.velocity.x * dt;
+    this.mesh.position.x += dx;
+    this.checkCollision(colliders, 'x', dx);
+
+    // 2. Y Axis
+    const dy = this.velocity.y * dt;
+    this.mesh.position.y += dy;
+    this.checkCollision(colliders, 'y', dy);
+
+    // 3. Z Axis
+    const dz = this.velocity.z * dt;
+    this.mesh.position.z += dz;
+    const hitFloor = this.checkCollision(colliders, 'z', dz);
+    
+    // Default Floor at Z=0 if not hitting a platform
+    if (!hitFloor && this.mesh.position.z <= 0) {
+        this.mesh.position.z = 0;
+        this.velocity.z = Math.max(0, this.velocity.z);
+        this.onGround = true;
+    } else if (!hitFloor) {
+        this.onGround = false;
+    }
+  }
+
+  // Robust AABB Collision Resolution with Step-Up Logic
+  private checkCollision(colliders: THREE.Box3[], axis: 'x' | 'y' | 'z', delta: number): boolean {
+      const pBox = this.getBoundingBox();
+
+      // "Skin Width" - Shrink box on non-active axes to prevent snagging
+      const skin = 0.02; // 2cm buffer
+
+      if (axis === 'x') {
+          pBox.min.y += skin; pBox.max.y -= skin;
+          pBox.min.z += skin; pBox.max.z -= skin;
+      } else if (axis === 'y') {
+          pBox.min.x += skin; pBox.max.x -= skin;
+          pBox.min.z += skin; pBox.max.z -= skin;
+      } else if (axis === 'z') {
+          pBox.min.x += skin; pBox.max.x -= skin;
+          pBox.min.y += skin; pBox.max.y -= skin;
+      }
+
+      let hitBox: THREE.Box3 | null = null;
+      let hit = false;
+
+      // Scan all colliders to find the *best* candidate for resolution
+      for (const box of colliders) {
+          if (pBox.intersectsBox(box)) {
+              hit = true;
+              
+              if (!hitBox) {
+                  hitBox = box;
+              } else {
+                  // Prioritize the collider that limits movement the most
+                  if (axis === 'x') {
+                      if (delta > 0) {
+                          if (box.min.x < hitBox.min.x) hitBox = box;
+                      } else {
+                          if (box.max.x > hitBox.max.x) hitBox = box;
+                      }
+                  } else if (axis === 'y') {
+                      if (delta > 0) {
+                          if (box.min.y < hitBox.min.y) hitBox = box;
+                      } else {
+                          if (box.max.y > hitBox.max.y) hitBox = box;
+                      }
+                  } else if (axis === 'z') {
+                       if (delta < 0) {
+                           if (box.max.z > hitBox.max.z) hitBox = box;
+                       } else {
+                           if (box.min.z < hitBox.min.z) hitBox = box;
+                       }
+                  }
+              }
+          }
+      }
+
+      if (hitBox) {
+          const box = hitBox;
+          const epsilon = 0.001; 
+
+          // --- STEP UP MECHANIC ---
+          // If moving horizontally and on ground, try to step up small obstacles
+          let stepped = false;
+          if ((axis === 'x' || axis === 'y') && this.onGround) {
+              const obstTop = box.max.z;
+              const playerBottom = this.mesh.position.z;
+              const stepHeight = obstTop - playerBottom;
+
+              // Allow step if obstacle is low enough and we are effectively at its base
+              if (stepHeight > 0 && stepHeight <= this.maxStepHeight) {
+                  this.mesh.position.z = obstTop;
+                  stepped = true;
+                  // We stepped up, so we don't treat this as a blocking wall.
+                  // We implicitly clear the X/Y collision by being "above" it now.
+              }
+          }
+
+          if (!stepped) {
+              // --- STANDARD RESOLUTION ---
+              if (axis === 'x') {
+                  if (delta > 0) this.mesh.position.x = box.min.x - this.radius - epsilon;
+                  else this.mesh.position.x = box.max.x + this.radius + epsilon;
+                  this.velocity.x = 0;
+              } else if (axis === 'y') {
+                  if (delta > 0) this.mesh.position.y = box.min.y - this.radius - epsilon;
+                  else this.mesh.position.y = box.max.y + this.radius + epsilon;
+                  this.velocity.y = 0;
+              } else if (axis === 'z') {
+                  if (delta < 0) {
+                      // Land on top
+                      this.mesh.position.z = box.max.z;
+                      this.velocity.z = 0;
+                      this.onGround = true;
+                  } else {
+                      // Bonk head
+                      this.mesh.position.z = box.min.z - this.height - epsilon;
+                      this.velocity.z = 0;
+                  }
+              }
+          }
+      }
+      
+      return hit;
+  }
+
+  public getBoundingBox(): THREE.Box3 {
+      const min = new THREE.Vector3(
+          this.mesh.position.x - this.radius,
+          this.mesh.position.y - this.radius,
+          this.mesh.position.z
+      );
+      const max = new THREE.Vector3(
+        this.mesh.position.x + this.radius,
+        this.mesh.position.y + this.radius,
+        this.mesh.position.z + this.height
+      );
+      return new THREE.Box3(min, max);
   }
 
   public getPosition(): THREE.Vector3 {

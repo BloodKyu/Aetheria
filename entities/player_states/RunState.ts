@@ -2,25 +2,66 @@
 import { PlayerState } from './State';
 import { InputState, StateID } from '../../types';
 import { GAME_CONFIG } from '../../constants';
+import * as THREE from 'three';
 
 export class RunState extends PlayerState {
   enter(): void {}
 
-  update(dt: number, input: InputState): void {
+  update(dt: number, input: InputState, camera?: THREE.Camera): void {
     if (input.phase) { this.player.switchState(StateID.PHASE); return; }
     if (input.jump && this.player.onGround) { this.player.switchState(StateID.JUMP); return; }
     if (input.attack) { this.player.switchState(StateID.ATTACK); return; }
     if (input.blitz) { this.player.switchState(StateID.BLITZ); return; }
     if (input.move.x === 0 && input.move.y === 0) { this.player.switchState(StateID.IDLE); return; }
 
-    // MOVEMENT MAPPING
     const speed = GAME_CONFIG.PLAYER_SPEED;
-    this.player.velocity.x = input.move.y * -speed; 
-    this.player.velocity.y = input.move.x * -speed; 
+    
+    // CAMERA RELATIVE MOVEMENT
+    if (camera) {
+        // Forward (from camera POV projected to ground)
+        const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        camFwd.z = 0; camFwd.normalize();
+        
+        // Right
+        const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        camRight.z = 0; camRight.normalize();
 
-    // Facing Rotation
-    const targetAngle = Math.atan2(this.player.velocity.y, this.player.velocity.x);
-    this.player.mesh.rotation.z = targetAngle;
+        // Combine inputs (Y is forward/back, X is left/right)
+        // input.move.y is -1 for Forward, so we flip it
+        const moveVec = new THREE.Vector3()
+            .addScaledVector(camFwd, -input.move.y)
+            .addScaledVector(camRight, input.move.x);
+        
+        this.player.velocity.x = moveVec.x * speed;
+        this.player.velocity.y = moveVec.y * speed;
+    } else {
+        // Fallback (Absolute World)
+        this.player.velocity.x = input.move.y * -speed; 
+        this.player.velocity.y = input.move.x * -speed; 
+    }
+
+    // FACING LOGIC
+    if (this.player.lockTarget) {
+      // STRAFE MODE: Face Target
+      const dx = this.player.lockTarget.x - this.player.mesh.position.x;
+      const dy = this.player.lockTarget.y - this.player.mesh.position.y;
+      const targetAngle = Math.atan2(dy, dx);
+      
+      // Smoothly rotate towards target
+      let angleDiff = targetAngle - this.player.mesh.rotation.z;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      this.player.mesh.rotation.z += angleDiff * dt * 10;
+    } else {
+      // FREE MODE: Face Movement Direction
+      const targetAngle = Math.atan2(this.player.velocity.y, this.player.velocity.x);
+      
+      let angleDiff = targetAngle - this.player.mesh.rotation.z;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      // Slower turn speed for weight
+      this.player.mesh.rotation.z += angleDiff * dt * 10;
+    }
 
     // ANIMATION
     const OPTS = this.player.animConfig;

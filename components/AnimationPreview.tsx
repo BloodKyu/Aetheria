@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -102,7 +101,8 @@ export const AnimationPreview: React.FC<Props> = ({ config, stateName }) => {
                     jump: false,
                     attack: false,
                     blitz: false,
-                    phase: false
+                    phase: false,
+                    focus: false
                 };
 
                 // Continuous Input Simulation

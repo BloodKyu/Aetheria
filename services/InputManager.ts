@@ -11,6 +11,7 @@ class InputManager {
       attack: false,
       blitz: false,
       phase: false,
+      focus: false
     };
 
     this.initKeyboardListeners();
@@ -46,10 +47,14 @@ class InputManager {
       case 'Enter':
         this.state.attack = isDown;
         break;
+      case 'KeyX':
+      case 'KeyK':
+        this.state.blitz = isDown;
+        break;
       case 'ShiftLeft':
       case 'ShiftRight':
       case 'KeyZ':
-        this.state.blitz = isDown;
+        this.state.focus = isDown;
         break;
       case 'KeyP':
         if (isDown) this.state.phase = !this.state.phase; // Toggle
@@ -69,10 +74,11 @@ class InputManager {
     }
   }
 
-  public setVirtualButton(action: 'jump' | 'attack' | 'blitz', pressed: boolean) {
+  public setVirtualButton(action: 'jump' | 'attack' | 'blitz' | 'focus', pressed: boolean) {
     if (action === 'jump') this.state.jump = pressed;
     if (action === 'attack') this.state.attack = pressed;
     if (action === 'blitz') this.state.blitz = pressed;
+    if (action === 'focus') this.state.focus = pressed;
   }
 
   public getState(): InputState {

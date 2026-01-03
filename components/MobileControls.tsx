@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { inputManager } from '../services/InputManager';
 
@@ -21,13 +22,11 @@ export const MobileControls: React.FC = () => {
       startX = touch.clientX;
       startY = touch.clientY;
       setActive(true);
-      // Reset pos immediately to center relative to touch? 
-      // N64 Style: The stick centers itself.
     };
 
     const handleMove = (e: TouchEvent) => {
       e.preventDefault();
-      if (!active) return; // Should likely use a ref for active if relying on closures, but event listeners are added once here.
+      if (!active) return; 
 
       const touch = e.changedTouches[0];
       const dx = touch.clientX - startX;
@@ -64,12 +63,22 @@ export const MobileControls: React.FC = () => {
       element.removeEventListener('touchmove', handleMove);
       element.removeEventListener('touchend', handleEnd);
     };
-  }, [active]); // Re-bind if active changes? actually handleMove closure captures initial active state? 
-  // Better approach: use refs for logic inside event handlers to avoid dependency mess.
+  }, [active]); 
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-50">
       
+      {/* Z-Target Trigger (L Button Position style) - Top Left/Mid Left */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-4 pointer-events-auto">
+         <button
+          className="w-14 h-14 rounded-lg bg-gray-500 border-4 border-gray-600 text-yellow-400 font-bold text-xl active:scale-95 active:bg-gray-700 shadow-xl touch-none flex items-center justify-center opacity-80"
+          onTouchStart={(e) => { e.preventDefault(); inputManager.setVirtualButton('focus', true); }}
+          onTouchEnd={(e) => { e.preventDefault(); inputManager.setVirtualButton('focus', false); }}
+        >
+          Z
+        </button>
+      </div>
+
       {/* Joystick Area - Bottom Left */}
       <div 
         ref={joystickRef}

@@ -130,7 +130,7 @@ export const DebugUI: React.FC = () => {
   if (!visible) return (
     <button 
       onClick={() => setVisible(true)}
-      className="absolute top-4 left-4 bg-gray-900/90 text-white px-3 py-2 text-xs font-mono border border-gray-600 rounded hover:bg-gray-700 transition-colors z-[100] shadow-lg backdrop-blur-sm"
+      className="absolute top-20 right-4 bg-gray-900/90 text-white px-3 py-2 text-xs font-mono border border-gray-600 rounded hover:bg-gray-700 transition-colors z-[100] shadow-lg backdrop-blur-sm"
     >
       ⚙️ STUDIO
     </button>
@@ -139,7 +139,7 @@ export const DebugUI: React.FC = () => {
   return (
     <div 
       ref={panelRef}
-      className="absolute top-4 left-4 bg-gray-900/95 text-white flex flex-col font-mono text-xs z-[100] rounded-lg border border-gray-600 shadow-2xl overflow-hidden"
+      className="absolute top-4 right-4 bg-gray-900/95 text-white flex flex-col font-mono text-xs z-[100] rounded-lg border border-gray-600 shadow-2xl overflow-hidden"
       style={{ 
           width: '340px', 
           height: '600px',

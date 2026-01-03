@@ -2,18 +2,38 @@
 import { PlayerState } from './State';
 import { InputState, StateID } from '../../types';
 import { GAME_CONFIG } from '../../constants';
+import { audioSystem } from '../../services/AudioSystem';
+import * as THREE from 'three';
 
 export class JumpState extends PlayerState {
   enter(): void {
     this.player.velocity.z = GAME_CONFIG.JUMP_FORCE;
     this.player.onGround = false;
+    audioSystem.play('jump', 0.5, 0.9 + Math.random() * 0.2);
   }
 
-  update(dt: number, input: InputState): void {
+  update(dt: number, input: InputState, camera?: THREE.Camera): void {
     const airSpeed = GAME_CONFIG.PLAYER_SPEED * 0.8;
+    
     if (input.move.x !== 0 || input.move.y !== 0) {
-        this.player.velocity.x = input.move.y * -airSpeed;
-        this.player.velocity.y = input.move.x * -airSpeed;
+        if (camera) {
+             const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+             camFwd.z = 0; camFwd.normalize();
+             
+             const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+             camRight.z = 0; camRight.normalize();
+
+             const moveVec = new THREE.Vector3()
+                 .addScaledVector(camFwd, -input.move.y)
+                 .addScaledVector(camRight, input.move.x);
+
+             this.player.velocity.x = moveVec.x * airSpeed;
+             this.player.velocity.y = moveVec.y * airSpeed;
+        } else {
+             this.player.velocity.x = input.move.y * -airSpeed;
+             this.player.velocity.y = input.move.x * -airSpeed;
+        }
+        
         this.player.mesh.rotation.z = Math.atan2(this.player.velocity.y, this.player.velocity.x);
     }
 
@@ -40,13 +60,9 @@ export class JumpState extends PlayerState {
 
     const wobble = Math.sin(time * 3) * OPTS.jumpArmWobble;
     
-    // Jump Pose Override
-    // Previous hardcoded offsets are now baked into jump_pose_... defaults
-    
-    // Shoulders
     p.shoulderL.rotation.set(
         OPTS.jump_pose_ArmL_Upper_X + wobble,
-        OPTS.jump_pose_ArmL_Upper_Y, // Use direct slider value
+        OPTS.jump_pose_ArmL_Upper_Y, 
         OPTS.jump_pose_ArmL_Upper_Z
     );
     p.lowerArmL.rotation.set(
@@ -57,7 +73,7 @@ export class JumpState extends PlayerState {
 
     p.shoulderR.rotation.set(
         OPTS.jump_pose_ArmR_Upper_X - wobble,
-        OPTS.jump_pose_ArmR_Upper_Y, // Use direct slider value
+        OPTS.jump_pose_ArmR_Upper_Y, 
         OPTS.jump_pose_ArmR_Upper_Z
     );
     p.lowerArmR.rotation.set(
@@ -66,7 +82,6 @@ export class JumpState extends PlayerState {
         OPTS.jump_pose_ArmR_Lower_Z
     );
 
-    // Legs - Cycling
     const legY = Math.sin(time) * OPTS.jumpLegAmp;
     const kneeY = Math.max(0.1, (1 - Math.sin(time)) * 1.5);
     

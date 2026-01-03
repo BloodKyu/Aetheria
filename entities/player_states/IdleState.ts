@@ -1,6 +1,7 @@
 
 import { PlayerState } from './State';
 import { InputState, StateID } from '../../types';
+import * as THREE from 'three';
 
 export class IdleState extends PlayerState {
   enter(): void {
@@ -8,12 +9,24 @@ export class IdleState extends PlayerState {
     this.player.velocity.y = 0; // Stop horizontal
   }
 
-  update(dt: number, input: InputState): void {
+  update(dt: number, input: InputState, camera?: THREE.Camera): void {
     if (input.phase) { this.player.switchState(StateID.PHASE); return; }
     if (input.jump && this.player.onGround) { this.player.switchState(StateID.JUMP); return; }
     if (input.attack) { this.player.switchState(StateID.ATTACK); return; }
     if (input.blitz) { this.player.switchState(StateID.BLITZ); return; }
     if (input.move.x !== 0 || input.move.y !== 0) { this.player.switchState(StateID.RUN); return; }
+
+    // LOCK ON ROTATION
+    if (this.player.lockTarget) {
+      const dx = this.player.lockTarget.x - this.player.mesh.position.x;
+      const dy = this.player.lockTarget.y - this.player.mesh.position.y;
+      const targetAngle = Math.atan2(dy, dx);
+      // Smoothly rotate towards target
+      let angleDiff = targetAngle - this.player.mesh.rotation.z;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      this.player.mesh.rotation.z += angleDiff * dt * 10;
+    }
 
     const OPTS = this.player.animConfig;
     const time = Date.now() * 0.002 * OPTS.idleBreathSpeed;
