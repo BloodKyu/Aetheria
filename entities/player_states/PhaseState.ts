@@ -1,44 +1,36 @@
 
 import { PlayerState } from './State';
-import { InputState } from '../../types';
-import { IdleState } from './IdleState';
+import { InputState, StateID } from '../../types';
 import * as THREE from 'three';
 
 export class PhaseState extends PlayerState {
   
   enter(): void {
-    // Make Transparent
     this.setOpacity(0.3);
-    this.player.velocity.set(0, 0, 0); // Stop moving
+    this.player.velocity.set(0, 0, 0); 
   }
 
   update(dt: number, input: InputState): void {
-    // Float Up and Down gently
     const time = Date.now() * 0.001;
-    this.player.mesh.position.y = Math.sin(time) * 0.5 + 1.0;
+    this.player.mesh.position.z = Math.sin(time) * 0.5 + 1.0;
 
-    // Exit if Phase toggled off
     if (!input.phase) {
-        this.player.setState(new IdleState(this.player));
+        this.player.switchState(StateID.IDLE);
     }
 
-    // Rotate slowly
-    this.player.mesh.rotation.y += dt;
+    this.player.mesh.rotation.z += dt;
 
-    // T-Pose for dominance/meditation
     const p = this.player.parts;
-    p.pelvis.rotation.x = 0;
-    p.shoulderL.rotation.x = 0;
-    p.shoulderL.rotation.z = 1.5;
-    p.shoulderR.rotation.x = 0;
-    p.shoulderR.rotation.z = -1.5;
-    p.hipL.rotation.x = 0;
-    p.hipR.rotation.x = 0;
+    p.pelvis.rotation.y = 0;
+    p.shoulderL.rotation.y = 0;
+    p.shoulderL.rotation.x = 1.5; // T-Pose Roll
+    p.shoulderR.rotation.y = 0;
+    p.shoulderR.rotation.x = -1.5;
   }
 
   exit(): void {
     this.setOpacity(1.0);
-    this.player.onGround = false; // Might drop
+    this.player.onGround = false; 
   }
 
   private setOpacity(opacity: number) {

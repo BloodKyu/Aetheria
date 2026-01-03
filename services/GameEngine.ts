@@ -21,6 +21,9 @@ export class GameEngine {
   constructor(container: HTMLElement) {
     this.container = container;
     
+    // 0. GLOBAL Z-UP CONFIGURATION
+    THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+
     // 1. Setup Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: false });
     this.renderer.setSize(GAME_CONFIG.INTERNAL_WIDTH, GAME_CONFIG.INTERNAL_HEIGHT, false);
@@ -30,9 +33,9 @@ export class GameEngine {
     this.renderer.domElement.style.height = '100%';
     this.renderer.domElement.style.display = 'block';
     
-    // Important: The canvas in DOM will be scaled up by CSS, so we keep internal buffer small
-    // to mimic N64 resolution and "pixelated" filter.
     this.renderer.setClearColor(COLORS.SKY);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
     
     // Append to DOM
     this.container.appendChild(this.renderer.domElement);
@@ -49,7 +52,9 @@ export class GameEngine {
     this.scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(10, 20, 10);
+    // Light coming from sun (High Z, angled)
+    dirLight.position.set(-10, 20, 30);
+    dirLight.castShadow = true;
     this.scene.add(dirLight);
 
     // 5. Entities
@@ -75,37 +80,26 @@ export class GameEngine {
   }
 
   private handleResize() {
-    // We maintain the internal low resolution, but the CSS handles the display size.
-    // However, if we wanted to support responsive ASPECT RATIO change on the low-res buffer:
-    // Ideally N64 games were 4:3. We can force 4:3 or allow widescreen. 
-    // Let's stick to the container's aspect ratio but render at low res.
-    
-    // Calculate aspect ratio of the container (screen)
     const aspect = this.container.clientWidth / this.container.clientHeight;
-    
-    // Update camera
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
 
-    // Re-set size? No, strictly stick to 320 width, calculate height based on aspect?
-    // Or stick to fixed 320x240 and stretch? 
-    // Best practice for "Modern Retro": Fixed vertical resolution (e.g. 240p), dynamic width.
     const renderHeight = GAME_CONFIG.INTERNAL_HEIGHT;
     const renderWidth = Math.floor(renderHeight * aspect);
-    
     this.renderer.setSize(renderWidth, renderHeight, false);
   }
 
   private updateCamera() {
     const playerPos = this.player.getPosition();
     
-    // Simple Follow Camera
+    // Follow Camera (X-Front, Z-Up logic applied via constants)
     const offset = new THREE.Vector3(
       GAME_CONFIG.CAMERA_OFFSET.x,
       GAME_CONFIG.CAMERA_OFFSET.y,
       GAME_CONFIG.CAMERA_OFFSET.z
     );
     
+    // Simple spring/lerp could go here, but strict follow for now
     this.camera.position.copy(playerPos).add(offset);
     this.camera.lookAt(
         playerPos.x + GAME_CONFIG.CAMERA_LOOK_AT_OFFSET.x,
@@ -117,7 +111,7 @@ export class GameEngine {
   private loop() {
     this.animationId = requestAnimationFrame(this.loop.bind(this));
     
-    const dt = Math.min(this.clock.getDelta(), 0.1); // Cap delta to avoid huge jumps
+    const dt = Math.min(this.clock.getDelta(), 0.1); 
     const input = inputManager.getState();
 
     this.player.update(dt, input);

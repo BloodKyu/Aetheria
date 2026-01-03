@@ -1,72 +1,87 @@
 
 import { PlayerState } from './State';
-import { InputState } from '../../types';
-import { RunState } from './RunState';
-import { JumpState } from './JumpState';
-import { AttackState } from './AttackState';
-import { BlitzState } from './BlitzState';
-import { PhaseState } from './PhaseState';
+import { InputState, StateID } from '../../types';
 
 export class IdleState extends PlayerState {
   enter(): void {
-    // Reset specific parts if needed
     this.player.velocity.x = 0;
-    this.player.velocity.z = 0;
+    this.player.velocity.y = 0; // Stop horizontal
   }
 
   update(dt: number, input: InputState): void {
-    // Transitions
-    if (input.phase) {
-        this.player.setState(new PhaseState(this.player));
-        return;
-    }
-    if (input.jump && this.player.onGround) {
-      this.player.setState(new JumpState(this.player));
-      return;
-    }
-    if (input.attack) {
-      this.player.setState(new AttackState(this.player));
-      return;
-    }
-    if (input.blitz) {
-        this.player.setState(new BlitzState(this.player));
-        return;
-    }
-    if (input.move.x !== 0 || input.move.y !== 0) {
-      this.player.setState(new RunState(this.player));
-      return;
-    }
+    if (input.phase) { this.player.switchState(StateID.PHASE); return; }
+    if (input.jump && this.player.onGround) { this.player.switchState(StateID.JUMP); return; }
+    if (input.attack) { this.player.switchState(StateID.ATTACK); return; }
+    if (input.blitz) { this.player.switchState(StateID.BLITZ); return; }
+    if (input.move.x !== 0 || input.move.y !== 0) { this.player.switchState(StateID.RUN); return; }
 
-    // Idle Animation (Breathing)
-    const time = Date.now() * 0.002;
+    const OPTS = this.player.animConfig;
+    const time = Date.now() * 0.002 * OPTS.idleBreathSpeed;
     const breath = Math.sin(time * 2);
-
     const p = this.player.parts;
-    p.pelvis.position.y = 1.0 + breath * 0.01;
-    p.pelvis.rotation.x = 0;
 
-    // A-Pose Relaxed
-    p.shoulderL.rotation.x = 0;
-    p.shoulderL.rotation.z = -0.1; 
-    p.lowerArmL.rotation.x = -0.3;
+    // Pelvis Bob (Z-axis)
+    p.pelvis.position.z = 1.0 + breath * 0.01;
+    p.pelvis.rotation.y = 0;
 
-    p.shoulderR.rotation.x = 0;
-    p.shoulderR.rotation.z = 0.1;
-    p.lowerArmR.rotation.x = -0.3;
+    // --- APPLY IDLE POSE ---
 
-    // Legs Still
-    p.hipL.rotation.x = 0;
-    p.lowerLegL.rotation.x = 0;
-    p.hipR.rotation.x = 0;
-    p.lowerLegR.rotation.x = 0;
+    // Left Arm
+    p.shoulderL.rotation.set(
+      OPTS.idle_pose_ArmL_Upper_X, 
+      OPTS.idle_pose_ArmL_Upper_Y + (breath * 0.05), // Add breathing
+      OPTS.idle_pose_ArmL_Upper_Z
+    );
+    p.lowerArmL.rotation.set(
+      OPTS.idle_pose_ArmL_Lower_X,
+      OPTS.idle_pose_ArmL_Lower_Y,
+      OPTS.idle_pose_ArmL_Lower_Z
+    );
+
+    // Right Arm
+    p.shoulderR.rotation.set(
+      OPTS.idle_pose_ArmR_Upper_X,
+      OPTS.idle_pose_ArmR_Upper_Y + (breath * 0.05),
+      OPTS.idle_pose_ArmR_Upper_Z
+    );
+    p.lowerArmR.rotation.set(
+      OPTS.idle_pose_ArmR_Lower_X,
+      OPTS.idle_pose_ArmR_Lower_Y,
+      OPTS.idle_pose_ArmR_Lower_Z
+    );
+
+    // Left Leg
+    p.hipL.rotation.set(
+      OPTS.idle_pose_LegL_Upper_X,
+      OPTS.idle_pose_LegL_Upper_Y,
+      OPTS.idle_pose_LegL_Upper_Z
+    );
+    p.lowerLegL.rotation.set(
+      OPTS.idle_pose_LegL_Lower_X,
+      OPTS.idle_pose_LegL_Lower_Y,
+      OPTS.idle_pose_LegL_Lower_Z
+    );
+
+    // Right Leg
+    p.hipR.rotation.set(
+      OPTS.idle_pose_LegR_Upper_X,
+      OPTS.idle_pose_LegR_Upper_Y,
+      OPTS.idle_pose_LegR_Upper_Z
+    );
+    p.lowerLegR.rotation.set(
+      OPTS.idle_pose_LegR_Lower_X,
+      OPTS.idle_pose_LegR_Lower_Y,
+      OPTS.idle_pose_LegR_Lower_Z
+    );
 
     // Torso Breath
-    p.abdomen.rotation.x = breath * 0.02;
-    p.chest.rotation.x = breath * 0.02;
-    p.abdomen.rotation.y = 0;
-    p.chest.rotation.y = 0;
-
-    p.head.rotation.y = 0;
+    p.abdomen.rotation.y = breath * OPTS.idleBreathAmp;
+    p.chest.rotation.y = breath * OPTS.idleBreathAmp;
+    
+    // Twist
+    p.abdomen.rotation.z = 0;
+    p.chest.rotation.z = 0;
+    p.head.rotation.z = 0;
   }
 
   exit(): void {}

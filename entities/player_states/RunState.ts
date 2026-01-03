@@ -1,84 +1,86 @@
 
 import { PlayerState } from './State';
-import { InputState } from '../../types';
-import { IdleState } from './IdleState';
-import { JumpState } from './JumpState';
-import { AttackState } from './AttackState';
-import { BlitzState } from './BlitzState';
-import { PhaseState } from './PhaseState';
+import { InputState, StateID } from '../../types';
 import { GAME_CONFIG } from '../../constants';
 
 export class RunState extends PlayerState {
   enter(): void {}
 
   update(dt: number, input: InputState): void {
-    // 1. Logic & Transitions
-    if (input.phase) {
-        this.player.setState(new PhaseState(this.player));
-        return;
-    }
-    if (input.jump && this.player.onGround) {
-      this.player.setState(new JumpState(this.player));
-      return;
-    }
-    if (input.attack) {
-      this.player.setState(new AttackState(this.player));
-      return;
-    }
-    if (input.blitz) {
-        this.player.setState(new BlitzState(this.player));
-        return;
-    }
-    if (input.move.x === 0 && input.move.y === 0) {
-      this.player.setState(new IdleState(this.player));
-      return;
-    }
+    if (input.phase) { this.player.switchState(StateID.PHASE); return; }
+    if (input.jump && this.player.onGround) { this.player.switchState(StateID.JUMP); return; }
+    if (input.attack) { this.player.switchState(StateID.ATTACK); return; }
+    if (input.blitz) { this.player.switchState(StateID.BLITZ); return; }
+    if (input.move.x === 0 && input.move.y === 0) { this.player.switchState(StateID.IDLE); return; }
 
-    // 2. Movement Physics
+    // MOVEMENT MAPPING
     const speed = GAME_CONFIG.PLAYER_SPEED;
-    this.player.velocity.x = input.move.x * speed;
-    this.player.velocity.z = input.move.y * speed;
+    this.player.velocity.x = input.move.y * -speed; 
+    this.player.velocity.y = input.move.x * -speed; 
 
-    // Rotate Mesh
-    const targetAngle = Math.atan2(this.player.velocity.x, this.player.velocity.z);
-    this.player.mesh.rotation.y = targetAngle;
+    // Facing Rotation
+    const targetAngle = Math.atan2(this.player.velocity.y, this.player.velocity.x);
+    this.player.mesh.rotation.z = targetAngle;
 
-    // 3. Animation (Procedural)
-    // READ FROM PLAYER CONFIG
+    // ANIMATION
     const OPTS = this.player.animConfig;
-    
     const time = Date.now() * 0.012 * OPTS.runAnimSpeed;
     const p = this.player.parts;
 
     // Body Bounce
-    p.pelvis.position.y = 1.0 + Math.abs(Math.sin(time * 2)) * 0.1;
-    p.pelvis.rotation.x = 0.35; // Lean forward
+    p.pelvis.position.z = 1.0 + Math.abs(Math.sin(time * 2)) * 0.1;
+    p.pelvis.rotation.y = 0.35; 
 
     // Torso Twist
-    p.abdomen.rotation.y = Math.cos(time) * OPTS.torsoTwist;
-    p.chest.rotation.y = Math.cos(time) * OPTS.torsoTwist;
+    p.abdomen.rotation.z = Math.cos(time) * OPTS.torsoTwist;
+    p.chest.rotation.z = Math.cos(time) * OPTS.torsoTwist;
 
-    // Legs (High Knees)
-    p.hipL.rotation.x = Math.sin(time) * 1.1 - 0.3;
-    p.lowerLegL.rotation.x = Math.max(0, -Math.cos(time) * 2.5);
+    // Legs (Pitch Y) - Added to RUN Base Pose
+    const legLRunY = Math.sin(time) * 1.1 - 0.3;
+    const legLRunKnee = Math.max(0, -Math.cos(time) * 2.5);
 
-    p.hipR.rotation.x = Math.sin(time + Math.PI) * 1.1 - 0.3;
-    p.lowerLegR.rotation.x = Math.max(0, -Math.cos(time + Math.PI) * 2.5);
+    const legRRunY = Math.sin(time + Math.PI) * 1.1 - 0.3;
+    const legRRunKnee = Math.max(0, -Math.cos(time + Math.PI) * 2.5);
 
-    // Arms
-    // Left
-    p.shoulderL.rotation.x = Math.sin(time + OPTS.armSyncPhase) * OPTS.armShoulderAmp;
-    p.shoulderL.rotation.z = -OPTS.armZOffset;
-    p.lowerArmL.rotation.x = OPTS.armElbowBase + Math.sin(time + OPTS.armSyncPhase + OPTS.elbowPhase) * OPTS.armElbowAmp;
+    p.hipL.rotation.set(OPTS.run_pose_LegL_Upper_X, OPTS.run_pose_LegL_Upper_Y + legLRunY, OPTS.run_pose_LegL_Upper_Z);
+    p.lowerLegL.rotation.set(OPTS.run_pose_LegL_Lower_X, OPTS.run_pose_LegL_Lower_Y + legLRunKnee, OPTS.run_pose_LegL_Lower_Z);
 
-    // Right (Opposite)
-    p.shoulderR.rotation.x = Math.sin(time + OPTS.armSyncPhase + Math.PI) * OPTS.armShoulderAmp;
-    p.shoulderR.rotation.z = OPTS.armZOffset;
-    p.lowerArmR.rotation.x = OPTS.armElbowBase + Math.sin(time + OPTS.armSyncPhase + Math.PI + OPTS.elbowPhase) * OPTS.armElbowAmp;
+    p.hipR.rotation.set(OPTS.run_pose_LegR_Upper_X, OPTS.run_pose_LegR_Upper_Y + legRRunY, OPTS.run_pose_LegR_Upper_Z);
+    p.lowerLegR.rotation.set(OPTS.run_pose_LegR_Lower_X, OPTS.run_pose_LegR_Lower_Y + legRRunKnee, OPTS.run_pose_LegR_Lower_Z);
 
-    // Head Stabilization
-    const totalTorsoRot = p.abdomen.rotation.y + p.chest.rotation.y;
-    p.head.rotation.y = -totalTorsoRot * OPTS.headStabilize;
+    // Arms (Pitch Y) - Added to RUN Base Pose
+    const armLRunY = Math.sin(time + OPTS.armSyncPhase) * OPTS.armShoulderAmp;
+    const armLRunElbow = Math.sin(time + OPTS.armSyncPhase + OPTS.elbowPhase) * OPTS.armElbowAmp;
+
+    const armRRunY = Math.sin(time + OPTS.armSyncPhase + Math.PI) * OPTS.armShoulderAmp;
+    const armRRunElbow = Math.sin(time + OPTS.armSyncPhase + Math.PI + OPTS.elbowPhase) * OPTS.armElbowAmp;
+
+    // Apply Run Pose + Anim
+    p.shoulderL.rotation.set(
+        OPTS.run_pose_ArmL_Upper_X, 
+        OPTS.run_pose_ArmL_Upper_Y + armLRunY, 
+        OPTS.run_pose_ArmL_Upper_Z
+    );
+    p.lowerArmL.rotation.set(
+        OPTS.run_pose_ArmL_Lower_X,
+        OPTS.run_pose_ArmL_Lower_Y + armLRunElbow,
+        OPTS.run_pose_ArmL_Lower_Z
+    );
+
+    p.shoulderR.rotation.set(
+        OPTS.run_pose_ArmR_Upper_X,
+        OPTS.run_pose_ArmR_Upper_Y + armRRunY,
+        OPTS.run_pose_ArmR_Upper_Z
+    );
+    p.lowerArmR.rotation.set(
+        OPTS.run_pose_ArmR_Lower_X,
+        OPTS.run_pose_ArmR_Lower_Y + armRRunElbow,
+        OPTS.run_pose_ArmR_Lower_Z
+    );
+
+    // Head Stabilize
+    const totalTorsoRot = p.abdomen.rotation.z + p.chest.rotation.z;
+    p.head.rotation.z = -totalTorsoRot * OPTS.headStabilize;
   }
 
   exit(): void {}

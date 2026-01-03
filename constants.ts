@@ -1,14 +1,16 @@
+
 export const GAME_CONFIG = {
   INTERNAL_WIDTH: 640,
   INTERNAL_HEIGHT: 480,
   FOG_COLOR: 0x87CEEB,
   FOG_NEAR: 10,
   FOG_FAR: 40,
-  GRAVITY: 30,
+  GRAVITY: 30, // Acts on Z axis now
   PLAYER_SPEED: 8,
   JUMP_FORCE: 12,
-  CAMERA_OFFSET: { x: 0, y: 5, z: 8 },
-  CAMERA_LOOK_AT_OFFSET: { x: 0, y: 1, z: 0 },
+  // UE5 Style: X=Front, Z=Up. Camera Behind (-X) and Up (+Z)
+  CAMERA_OFFSET: { x: -8, y: 0, z: 5 },
+  CAMERA_LOOK_AT_OFFSET: { x: 0, y: 0, z: 1 },
 };
 
 export const COLORS = {
